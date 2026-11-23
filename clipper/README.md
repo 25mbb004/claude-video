@@ -37,6 +37,9 @@ python3 clipper/clipper.py vod.mp4 --start 1:20:00 --end 2:10:00 --n 8
 # the streamer has catchphrases? make them count as hype
 python3 clipper/clipper.py vod.mp4 --keywords "chat is this real,we're so back"
 
+# clean it up for monetization: mask slurs in captions, beep them in the audio
+python3 clipper/clipper.py vod.mp4 --censor slurs --bleep slurs     # or --censor all / --bleep all
+
 # face cam detected wrong? set it in source pixels (x,y,w,h)
 python3 clipper/clipper.py vod.mp4 --facecam 40,620,420,420
 ```

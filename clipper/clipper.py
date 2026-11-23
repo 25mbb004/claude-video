@@ -256,11 +256,32 @@ def vf_for(lay):
             "[b]scale=1080:-2[fg];[bg][fg]overlay=0:(H-h)/2,setsar=1[v0]"), 1380
 
 
+# ---------------------------------------------------------------- censoring
+SLUR = re.compile(r"\bnigg(?:a|as|az|er|ers)\b", re.I)
+SWEAR = re.compile(r"\b(?:mother)?fuck\w*|\bshit\w*|\bbitch\w*|\bpuss(?:y|ies)\b|\bdick\w*|\bcunt\w*|\bass(?:hole)?s?\b", re.I)
+
+
+def censor_word(w: str, level: str) -> str:
+    """level: none | slurs | all. Keeps the first letter so the word stays readable."""
+    if level == "none": return w
+    pats = [SLUR] + ([SWEAR] if level == "all" else [])
+    for pat in pats:
+        w = pat.sub(lambda m: m.group(0)[0] + "*" * (len(m.group(0)) - 1), w)
+    return w
+
+
+def bleep_spans(words, st, en, level: str) -> list[tuple[float, float]]:
+    if level == "none": return []
+    pats = [SLUR] + ([SWEAR] if level == "all" else [])
+    return [(max(w["s"] - st - .03, 0), min(w["e"] - st + .03, en - st)) for w in words
+            if st <= w["s"] < en and any(p.search(w["w"]) for p in pats)]
+
+
 # ---------------------------------------------------------------- captions (ASS, word by word)
 def ass_time(t): t = max(t, 0); return f"{int(t // 3600)}:{int(t % 3600 // 60):02d}:{t % 60:05.2f}"
 
 
-def write_ass(path: Path, words, st, en, cap_y, hook, font="Inter Display Black"):
+def write_ass(path: Path, words, st, en, cap_y, hook, font="Inter Display Black", censor="slurs"):
     ws = [w for w in words if w["e"] > st and w["s"] < en]
     groups, cur = [], []
     for w in ws:  # 1–3 words per caption, break on punctuation or pauses
@@ -291,22 +312,33 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             b = (g[k + 1]["s"] if k + 1 < len(g) else min(max(w["e"], w["s"] + .25), nxt[id(w)])) - st
             parts = []
             for m, x in enumerate(g):
-                t = re.sub(r"[{}\\]", "", x["w"]).upper()
+                t = re.sub(r"[{}\\]", "", censor_word(x["w"], censor)).upper()
                 parts.append(r"{\c&H00E5FF&}" + t + r"{\c&HFFFFFF&}" if m == k else t)
             pop = r"{\fscx112\fscy112\t(0,90,\fscx100\fscy100)}" if k == 0 else ""
             ev.append(f"Dialogue: 1,{ass_time(a)},{ass_time(b)},Cap,,0,0,0,,{{\\pos(540,{cap_y})}}{pop}{' '.join(parts)}")
     if hook:
+        hook = " ".join(censor_word(h, censor) for h in hook.split())
         ev.append(f"Dialogue: 2,{ass_time(0)},{ass_time(min(3.2, en - st))},Hook,,0,0,0,,{{\\fad(0,250)}}{hook}")
     path.write_text(head + "\n".join(ev) + "\n")
 
 
 # ---------------------------------------------------------------- render
-def render(video: Path, out: Path, st, en, lay, ass: Path | None, fps):
+def audio_chain(spans, dur) -> str:
+    """[0:a] → [a]: loudness-normalised, with each span muted and replaced by a 1 kHz beep."""
+    norm = "loudnorm=I=-14:TP=-1.5:LRA=11"
+    if not spans: return f";[0:a:0]{norm}[a]"
+    on = "+".join(f"between(t,{a:.3f},{b:.3f})" for a, b in spans)
+    return (f";[0:a:0]aresample=48000,aformat=channel_layouts=stereo,volume=0:enable='{on}'[am];"
+            f"aevalsrc='0.22*sin(2*PI*1000*t)*gt({on},0)':s=48000:d={dur:.3f},aformat=channel_layouts=stereo[bp];"
+            f"[am][bp]amix=inputs=2:normalize=0:duration=first,{norm}[a]")
+
+
+def render(video: Path, out: Path, st, en, lay, ass: Path | None, fps, bleeps=()):
     vf, _ = vf_for(lay)
-    chain = vf + (f";[v0]ass={ass.as_posix()}[v]" if ass else ";[v0]null[v]")
+    chain = vf + (f";[v0]ass={ass.as_posix()}[v]" if ass else ";[v0]null[v]") + audio_chain(list(bleeps), en - st)
     sh(["ffmpeg", "-y", "-v", "error", "-ss", f"{st:.3f}", "-t", f"{en - st:.3f}", "-i", str(video), "-filter_complex", chain,
-        "-map", "[v]", "-map", "0:a:0?", "-r", str(min(60, round(fps))), "-c:v", "libx264", "-preset", "medium", "-crf", "20",
-        "-pix_fmt", "yuv420p", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "192k",
+        "-map", "[v]", "-map", "[a]", "-r", str(min(60, round(fps))), "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart", str(out)])
 
 
@@ -323,6 +355,8 @@ def main():
     ap.add_argument("--pick", help="render only these candidate numbers, e.g. 1,3")
     ap.add_argument("--credit", default="", help='who the clip is from, e.g. "@streamer on Twitch" (goes in the post kit)')
     ap.add_argument("--tags", default="", help='hashtags for the post kit, e.g. "#streamer #gta6 #fyp"')
+    ap.add_argument("--censor", default="slurs", choices=["none", "slurs", "all"], help="mask words in captions (default: slurs)")
+    ap.add_argument("--bleep", default="none", choices=["none", "slurs", "all"], help="beep words in the audio")
     ap.add_argument("--no-captions", action="store_true"); ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 
@@ -364,9 +398,9 @@ def main():
         _, cap_y = vf_for(lay)
         ass = None
         if not a.no_captions:
-            ass = work / f"clip_{c['n']:02d}.ass"; write_ass(ass, words, c["start"], c["end"], cap_y, c["hook"])
+            ass = work / f"clip_{c['n']:02d}.ass"; write_ass(ass, words, c["start"], c["end"], cap_y, c["hook"], censor=a.censor)
         dst = out / f"clip_{c['n']:02d}.mp4"
-        render(video, dst, c["start"], c["end"], lay, ass, meta["fps"])
+        render(video, dst, c["start"], c["end"], lay, ass, meta["fps"], bleep_spans(words, c["start"], c["end"], a.bleep))
         c["layout"] = lay["kind"]; c["lay"] = lay; c["file"] = dst.name; c["ass"] = ass.name if ass else None
         title = (c["hook"] or c["text"][:60]).capitalize().rstrip(",")
         kit = [f"TITLE (≤ 60 chars, put the payoff first):\n{title[:60]}", "",
