@@ -97,10 +97,19 @@ def whisper_words(audio: Path, backend: str, key: str) -> list[dict]:
                           ("timestamp_granularities[]", "word"), ("timestamp_granularities[]", "segment")], audio)
     req = Request(url, data=body, method="POST", headers={"Authorization": f"Bearer {key}",
                   "Content-Type": f"multipart/form-data; boundary={b}", "User-Agent": "clipper/1.0 (python-urllib)"})
-    try:
-        data = json.loads(urlopen(req, context=ssl.create_default_context(), timeout=600).read())
-    except HTTPError as e:
-        sys.exit(f"whisper {e.code}: {e.read()[:300]!r}")
+    import time
+    for attempt in range(8):
+        try:
+            data = json.loads(urlopen(Request(url, data=body, method="POST", headers=req.headers),
+                                      context=ssl.create_default_context(), timeout=600).read())
+            break
+        except HTTPError as e:
+            detail = e.read()[:300]
+            if e.code in (429, 500, 502, 503) and attempt < 7:   # rate limit / hiccup: wait and retry
+                m = re.search(rb"try again in (?:(\d+)m)?([\d.]+)s", detail)
+                wait = (int(m.group(1) or 0) * 60 + float(m.group(2)) + 2) if m else float(e.headers.get("retry-after") or 30 * (attempt + 1))
+                print(f"    whisper {e.code}: waiting {wait:.0f}s then retrying", flush=True); time.sleep(min(wait, 1800)); continue
+            sys.exit(f"whisper {e.code}: {detail!r}")
     return [{"w": w["word"].strip(), "s": float(w["start"]), "e": float(w["end"])} for w in data.get("words") or [] if w.get("word", "").strip()]
 
 
@@ -113,11 +122,13 @@ def transcribe(video: Path, work: Path, t0: float, t1: float) -> list[dict]:
     words, chunk = [], 1200.0  # 20-minute chunks stay well under the upload cap
     s = t0
     while s < t1 - .5:
-        e = min(s + chunk, t1); part = work / f"chunk_{int(s)}.mp3"
+        e = min(s + chunk, t1); part = work / f"chunk_{int(s)}.mp3"; done = work / f"chunkwords_{int(s)}_{int(e)}.json"
+        if done.exists():
+            words += json.loads(done.read_text()); s = e; continue
         sh(["ffmpeg", "-y", "-v", "error", "-ss", str(s), "-t", str(e - s), "-i", str(video), "-vn", "-ac", "1", "-ar", "16000", "-b:a", "48k", str(part)])
         print(f"  transcribing {fmt(s)} → {fmt(e)} ({backend})", flush=True)
-        for w in whisper_words(part, backend, key):
-            words.append({"w": w["w"], "s": round(w["s"] + s, 3), "e": round(w["e"] + s, 3)})
+        got = [{"w": w["w"], "s": round(w["s"] + s, 3), "e": round(w["e"] + s, 3)} for w in whisper_words(part, backend, key)]
+        done.write_text(json.dumps(got)); words += got
         s = e
     cache.write_text(json.dumps(words))
     return words
