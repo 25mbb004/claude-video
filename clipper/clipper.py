@@ -205,7 +205,7 @@ def hook_text(words, st, en, peak):
     if cur: sent.append(cur)
     if not sent: return ""
     best = min(sent, key=lambda c: abs((c[0]["s"] + c[-1]["e"]) / 2 - peak))
-    txt = " ".join(w["w"] for w in best[:8]).strip(" ,")
+    txt = " ".join(w["w"] for w in best[:6]).strip(" ,")
     return re.sub(r"[{}\\]", "", txt).upper()
 
 
@@ -234,8 +234,8 @@ def plan_layout(face, meta, forced):
     if forced == "blur" or (forced == "auto" and face is None): return {"kind": "blur"}
     if face is None: return {"kind": "blur"}
     fx, fy, fw, fh = face; cx, cy = fx + fw / 2, fy + fh / 2
-    big_center = fw > .11 * W and .2 * W < cx < .8 * W
-    if forced == "crop" or (forced == "auto" and big_center):          # just-chatting / IRL: follow the face
+    cam_scene = fw > .07 * W and .15 * W < cx < .85 * W          # big face → the camera IS the scene
+    if forced == "crop" or (forced == "auto" and cam_scene):          # just-chatting / IRL: follow the face
         cw = min(W, H * 9 / 16); x = min(max(cx - cw / 2, 0), W - cw)
         return {"kind": "crop", "x": x, "w": cw}
     cw = min(W * .45, fw * 2.5); ch = cw / (1080 / 700)                 # face-cam panel, head and shoulders
@@ -293,7 +293,7 @@ def write_ass(path: Path, words, st, en, cap_y, hook, font="Inter Display Black"
 ScriptType: v4.00+
 PlayResX: 1080
 PlayResY: 1920
-WrapStyle: 2
+WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
@@ -315,7 +315,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 t = re.sub(r"[{}\\]", "", censor_word(x["w"], censor)).upper()
                 parts.append(r"{\c&H00E5FF&}" + t + r"{\c&HFFFFFF&}" if m == k else t)
             pop = r"{\fscx112\fscy112\t(0,90,\fscx100\fscy100)}" if k == 0 else ""
-            ev.append(f"Dialogue: 1,{ass_time(a)},{ass_time(b)},Cap,,0,0,0,,{{\\pos(540,{cap_y})}}{pop}{' '.join(parts)}")
+            ev.append([a, b, f"{{\\pos(540,{cap_y})}}{pop}{' '.join(parts)}"])
+    ev.sort(key=lambda e: e[0])
+    for i, e in enumerate(ev):                     # Whisper word times can go backwards: never overlap
+        if i: e[0] = max(e[0], ev[i - 1][1])
+        nxt = ev[i + 1][0] if i + 1 < len(ev) else en - st
+        e[1] = max(min(e[1], max(nxt, e[0] + .08)), e[0] + .08)
+    ev = [f"Dialogue: 1,{ass_time(a)},{ass_time(b)},Cap,,0,0,0,,{t}" for a, b, t in ev]
     if hook:
         hook = " ".join(censor_word(h, censor) for h in hook.split())
         ev.append(f"Dialogue: 2,{ass_time(0)},{ass_time(min(3.2, en - st))},Hook,,0,0,0,,{{\\fad(0,250)}}{hook}")
@@ -384,16 +390,14 @@ def main():
 
     pick = {int(x) for x in a.pick.split(",")} if a.pick else None
     fixed = tuple(float(v) for v in a.facecam.split(",")) if a.facecam else None
-    face = None
-    if not fixed and a.layout != "blur":
-        face = detect_faces(video, t0, t1, meta)   # one pass over the whole VOD: the cam stays put
-        print(f"  face cam: {'found at ' + ','.join(str(int(v)) for v in face) if face else 'none, using blur layout'}")
+    faces = {}
     for c in cands:
         if pick and c["n"] not in pick: continue
         if fixed:
             x, y, w, h = fixed; gw = min(meta["w"], meta["h"] * 1080 / 1220)
             lay = {"kind": "split", "cam": fixed, "game": ((meta["w"] - gw) / 2, 0, gw, meta["h"])}
         else:
+            face = detect_faces(video, c["start"], c["end"], meta) if a.layout != "blur" else None   # per clip: scenes change
             lay = plan_layout(face, meta, a.layout)
         _, cap_y = vf_for(lay)
         ass = None
