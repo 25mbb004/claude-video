@@ -42,6 +42,34 @@ python3 clipper/clipper.py vod.mp4 --facecam 40,620,420,420
 ```
 The transcript is cached in `clips/.work/`, so re-running with different `--pick`, `--hook` or `--layout` doesn't pay for transcription again.
 
+## Add-ons (separate tools, use any combination)
+
+### `punchzoom.py`: punch-in zoom on the hype moment
+Re-renders the clips with a fast zoom-in plus shake right on the peak, then eases back out. The captions stay sharp and still because the zoom happens underneath them. `--sfx` adds a short sub-bass boom on the hit.
+```bash
+python3 clipper/punchzoom.py vod.mp4 --clips clips --sfx            # → clip_NN_zoom.mp4
+python3 clipper/punchzoom.py vod.mp4 --clips clips --zoom 1.25 --hold 1.2 --pick 1
+```
+
+### `coldopen.py`: payoff first
+Puts the best ~2 seconds at the very start, then a white flash, then the whole clip from the beginning. It uses the zoomed version automatically if there is one.
+```bash
+python3 clipper/coldopen.py --clips clips                            # → clip_NN_cold.mp4 / clip_NN_zoom_cold.mp4
+python3 clipper/coldopen.py --clips clips --len 1.5 --lead 0.3
+```
+
+### `batch.py`: many VODs in, ranked clips out
+```text
+# vods.txt: source | credit | hashtags
+https://www.twitch.tv/videos/123456789 | @streamer on Twitch | #streamer #gta6 #fyp
+/path/to/local_vod.mp4 | @other on Kick
+```
+```bash
+python3 clipper/batch.py vods.txt --per-vod 5 --zoom --sfx --cold-open
+python3 clipper/batch.py vods.txt --dry-run        # just list the best moments per VOD
+```
+It runs clipper, then punchzoom, then coldopen for each VOD. The best version of every clip lands in `batch_out/_ready/`, **ranked best first**, with its post kit and an `index.csv`. A VOD that fails is logged (`<vod folder>/log.txt`) and skipped, and the rest keep going.
+
 ## Notes
 - **Only clip streams you're allowed to clip**, for example a paid clipping campaign or a streamer who allows it. Credit the streamer.
 - YouTube often blocks downloads from cloud servers ("confirm you're not a bot"). Run it on your own computer, or pass yt-dlp cookies.

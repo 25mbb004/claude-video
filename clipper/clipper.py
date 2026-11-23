@@ -356,7 +356,7 @@ def main():
             ass = work / f"clip_{c['n']:02d}.ass"; write_ass(ass, words, c["start"], c["end"], cap_y, c["hook"])
         dst = out / f"clip_{c['n']:02d}.mp4"
         render(video, dst, c["start"], c["end"], lay, ass, meta["fps"])
-        c["layout"] = lay["kind"]; c["file"] = dst.name
+        c["layout"] = lay["kind"]; c["lay"] = lay; c["file"] = dst.name; c["ass"] = ass.name if ass else None
         title = (c["hook"] or c["text"][:60]).capitalize().rstrip(",")
         kit = [f"TITLE (≤ 60 chars, put the payoff first):\n{title[:60]}", "",
                "CAPTION:", f"{title} 😭" + (f"\n\nClip from {a.credit}" if a.credit else ""), (a.tags or "").strip(), "",
