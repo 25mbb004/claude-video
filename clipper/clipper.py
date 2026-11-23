@@ -226,7 +226,11 @@ def detect_faces(video: Path, st: float, en: float, meta: dict):
             x, y, w, hh = max(f, key=lambda b: b[2] * b[3]); s = meta["w"] / 960
             boxes.append((x * s, y * s, w * s, hh * s))
     if len(boxes) < max(3, samples * .25): return None
-    return tuple(float(v) for v in np.median(np.array(boxes), 0))
+    # several people on camera: don't average them (that lands between them); follow the one seen most
+    B = np.array(boxes); cx = B[:, 0] + B[:, 2] / 2
+    groups = [B[np.abs(cx - c) < .08 * meta["w"]] for c in cx]
+    best = max(groups, key=len)
+    return tuple(float(v) for v in np.median(best, 0))
 
 
 def plan_layout(face, meta, forced):
