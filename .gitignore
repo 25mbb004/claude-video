@@ -14,3 +14,11 @@ htmlcov/
 
 # local Claude Code settings
 .claude/settings.local.json
+
+# motion toolkit build outputs
+motion/**/node_modules/
+motion/**/out/*.png
+motion/**/frames/
+motion/**/test/
+motion/**/*.wav
+motion/**/*.mp4

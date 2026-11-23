@@ -1,0 +1,257 @@
+<title>Ray of Solar Style Frames</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: a screening sheet. Beat-map ribbon up top, then one wide row per style: Build → Silence → Drop. */
+  :root {
+    color-scheme: dark;
+    --bg: #0d0c0b;
+    --panel: #161412;
+    --fg: #ece6da;
+    --muted: #958c7e;
+    --line: #2a2622;
+    --gold: #e3a24c;
+    --silence: #3a342d;
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0 64px;
+  }
+  .wrap { max-width: 1480px; margin: 0 auto; }
+  .mono { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+
+  header { padding-block: 56px 28px; display: grid; gap: 22px; }
+  h1 {
+    font-family: var(--display); font-stretch: 125%; font-weight: 800; text-transform: uppercase;
+    font-size: clamp(34px, 6.4vw, 92px); line-height: .92; letter-spacing: -.01em; margin: 0; text-wrap: balance;
+  }
+  h1 span { color: var(--gold); }
+  .lede { max-width: 66ch; margin: 0; color: var(--fg); }
+  .specs { display: flex; flex-wrap: wrap; gap: 10px 28px; }
+  .specs div { display: grid; gap: 2px; }
+  .specs b { font-family: var(--mono); font-weight: 500; font-size: 15px; letter-spacing: .02em; }
+
+  /* beat ribbon: the 15 s clip drawn to scale */
+  .ribbon { display: grid; gap: 8px; padding-block: 8px 34px; border-bottom: 1px solid var(--line); }
+  .bar { position: relative; height: 34px; display: flex; border: 1px solid var(--line); }
+  .seg { position: relative; height: 100%; }
+  .seg.build { width: 31.33%; background: repeating-linear-gradient(90deg, #2c2721 0 2px, transparent 2px 7px); }
+  .seg.silence { width: 7.47%; background: #050505; }
+  .seg.drop { width: 61.2%; background: repeating-linear-gradient(90deg, var(--gold) 0 2px, rgba(227,162,76,.12) 2px 2.953%); }
+  .seg span { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--fg); white-space: nowrap; }
+  .seg.drop span { background: var(--bg); padding: 2px 6px; }
+  .ticks { position: relative; height: 16px; }
+  .ticks span { position: absolute; top: 0; transform: translateX(-50%); color: var(--muted); }
+  .ticks span:first-child { transform: none; }
+  .ticks span:last-child { transform: translateX(-100%); }
+
+  section.style { padding-block: 48px; border-bottom: 1px solid var(--line); display: grid; gap: 22px; }
+  .head { display: grid; grid-template-columns: auto 1fr; gap: 6px 22px; align-items: baseline; }
+  .code {
+    font-family: var(--display); font-stretch: 62%; font-weight: 900; font-size: 64px; line-height: .8; color: var(--gold);
+    grid-row: span 2; white-space: nowrap;
+  }
+  #ink-ridges { border-top: 2px solid var(--gold); }
+  h2 { font-family: var(--display); font-stretch: 112%; font-weight: 800; text-transform: uppercase; font-size: clamp(24px, 3vw, 38px); line-height: 1; margin: 0; letter-spacing: .005em; }
+  .log { margin: 0; max-width: 70ch; color: var(--muted); }
+
+  .frames { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  figure { margin: 0; display: grid; gap: 8px; min-width: 0; }
+  figure button {
+    all: unset; cursor: zoom-in; display: block; aspect-ratio: 16 / 9; max-width: 100%; background: #000; outline-offset: 3px;
+  }
+  figure button:focus-visible { outline: 2px solid var(--gold); }
+  figure img { width: 100%; height: 100%; object-fit: cover; display: block; transition: filter .2s; }
+  figure button:hover img { filter: brightness(1.08); }
+  figcaption { display: flex; justify-content: space-between; gap: 12px; }
+  figcaption .phase { color: var(--fg); }
+  figcaption .phase.drop { color: var(--gold); }
+
+  .notes { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 2fr); gap: 12px 40px; }
+  .notes dl { margin: 0; display: grid; gap: 4px; }
+  .notes dt { color: var(--muted); }
+  .notes dd { margin: 0 0 10px; }
+  .beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .beats li { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 14px; }
+  .beats .mono { padding-top: 3px; }
+
+  footer { padding-block: 40px 0; display: grid; gap: 8px; max-width: 80ch; }
+
+  dialog { padding: 0; border: 0; background: transparent; max-width: 96vw; max-height: 92vh; }
+  dialog::backdrop { background: rgba(0,0,0,.92); }
+  dialog img { display: block; max-width: 96vw; max-height: 86vh; }
+  dialog p { margin: 10px 0 0; color: var(--fg); }
+  dialog form { position: fixed; top: max(14px, env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); }
+  dialog form button { all: unset; cursor: pointer; padding: 8px 12px; border: 1px solid var(--line); color: var(--fg); background: var(--panel); }
+  dialog form button:focus-visible { outline: 2px solid var(--gold); }
+
+  @media (max-width: 820px) {
+    .frames { grid-template-columns: minmax(0, 1fr); }
+    .notes { grid-template-columns: minmax(0, 1fr); }
+    .seg span { font-size: 10px; left: 4px; }
+    .seg.silence span { display: none; }
+    .code { font-size: 48px; }
+  }
+  @media (prefers-reduced-motion: reduce) { figure img { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="mono muted">Style frames / Ray of Solar · Swedish House Mafia / clip 00:58 → 01:13</div>
+    <h1>Five ways<br>to hit <span>the drop</span></h1>
+    <p class="lede">Five directions for the same 15 seconds. Each row shows the three beats that matter: the snare roll building, the 1.1 seconds of silence, and the first bar of the drop. Every frame is rendered in code from shaders or canvas at 1920×1080. There's no stock footage and no AI image generation, so any value you see can be keyed straight to the beat map.</p>
+    <div class="specs">
+      <div><span class="mono muted">Tempo</span><b>136 BPM</b></div>
+      <div><span class="mono muted">Key</span><b>F♯ minor</b></div>
+      <div><span class="mono muted">1 bar</span><b>1.772 s</b></div>
+      <div><span class="mono muted">Silence</span><b>01:02.70 → 01:03.82</b></div>
+      <div><span class="mono muted">Drop</span><b>01:03.82</b></div>
+    </div>
+  </header>
+
+  <div class="ribbon" aria-label="Clip timeline drawn to scale">
+    <div class="bar">
+      <div class="seg build"><span class="mono">Build · 16th roll</span></div>
+      <div class="seg silence"><span class="mono">Hold</span></div>
+      <div class="seg drop"><span class="mono">Drop · kick every 0.443 s</span></div>
+    </div>
+    <div class="ticks mono">
+      <span style="left:0">00:58.00</span>
+      <span style="left:31.33%">01:02.70</span>
+      <span style="left:38.8%">01:03.82</span>
+      <span style="left:100%">01:13.00</span>
+    </div>
+  </div>
+
+  <section class="style" id="ink-ridges">
+    <div class="head"><div class="code">C+D</div><h2>Ink Ridges</h2><p class="log">The chosen merge: gold ink runs through a landscape of sound lines, and the drop opens an ink eclipse behind a spire.</p></div>
+    <div class="frames">
+      <figure><button data-full="frames/merge_0.jpg" aria-label="Open Ink Ridges build frame"><img src="frames/merge_0.jpg" alt="Gold ink rising like smoke from the peak of a line-drawn terrain" loading="lazy"></button><figcaption class="mono"><span class="phase">Build</span><span class="muted">01:00.4</span></figcaption></figure>
+      <figure><button data-full="frames/merge_1.jpg" aria-label="Open Ink Ridges silence frame"><img src="frames/merge_1.jpg" alt="The terrain flattened to black, one gold ink thread lying on the horizon" loading="lazy"></button><figcaption class="mono"><span class="phase">Silence</span><span class="muted">01:03.2</span></figcaption></figure>
+      <figure><button data-full="frames/merge_2.jpg" aria-label="Open Ink Ridges drop frame"><img src="frames/merge_2.jpg" alt="A spire of gold ink lines in front of a molten gold eclipse ring" loading="lazy"></button><figcaption class="mono"><span class="phase drop">Drop</span><span class="muted">01:03.82</span></figcaption></figure>
+    </div>
+    <div class="notes">
+      <dl><dt class="mono">Engine</dt><dd>Ridge Lines terrain (D) with every accent line painted using a full-frame domain-warped ink texture (C). The ink plume, thread and eclipse from C are composited into the sky.</dd></dl>
+      <ul class="beats">
+        <li><span class="mono muted">Build</span><span>Ink rises like smoke from the peak, and every fourth line carries flowing ink toward camera on the 16ths.</span></li>
+        <li><span class="mono muted">Silence</span><span>The whole landscape goes black, and all the ink collapses into one thread on the horizon.</span></li>
+        <li><span class="mono muted">Drop</span><span>The thread bursts into the ink eclipse, the spire erupts, and every line fills with gold. Line amplitude and ring glow follow the kick.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="style" id="storm">
+    <div class="head"><div class="code">A</div><h2>Storm Ascent</h2><p class="log">You climb through a thunderstorm and break above the clouds on the downbeat.</p></div>
+    <div class="frames">
+      <figure><button data-full="frames/storm_0.jpg" aria-label="Open Storm Ascent build frame"><img src="frames/storm_0.jpg" alt="Lightning splits a dark storm cloud from the inside" loading="lazy"></button><figcaption class="mono"><span class="phase">Build</span><span class="muted">01:00.4</span></figcaption></figure>
+      <figure><button data-full="frames/storm_1.jpg" aria-label="Open Storm Ascent silence frame"><img src="frames/storm_1.jpg" alt="Looking up a black funnel of cloud toward a ring of gold light" loading="lazy"></button><figcaption class="mono"><span class="phase">Silence</span><span class="muted">01:03.2</span></figcaption></figure>
+      <figure><button data-full="frames/storm_2.jpg" aria-label="Open Storm Ascent drop frame"><img src="frames/storm_2.jpg" alt="Sunrise over a sea of billowing clouds" loading="lazy"></button><figcaption class="mono"><span class="phase drop">Drop</span><span class="muted">01:03.82</span></figcaption></figure>
+    </div>
+    <div class="notes">
+      <dl><dt class="mono">Engine</dt><dd>Volumetric raymarch: fbm density, Beer-powder light march, Henyey-Greenstein phase. Fractal 2D bolt composited on top.</dd></dl>
+      <ul class="beats">
+        <li><span class="mono muted">Build</span><span>Every 16th of the roll fires a strike that lights the cloud from inside. The strikes get closer together as the roll tightens.</span></li>
+        <li><span class="mono muted">Silence</span><span>Eye of the storm: the camera tilts up a black funnel, and only the opening is lit.</span></li>
+        <li><span class="mono muted">Drop</span><span>The camera punches through into the sunrise. Sun bloom and cloud rim light pulse on each kick.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="style" id="chrome">
+    <div class="head"><div class="code">B</div><h2>Liquid Chrome</h2><p class="log">A body of mercury that listens to the bass.</p></div>
+    <div class="frames">
+      <figure><button data-full="frames/chrome_0.jpg" aria-label="Open Liquid Chrome build frame"><img src="frames/chrome_0.jpg" alt="A wobbling chrome blob with satellite droplets reflecting a gold horizon" loading="lazy"></button><figcaption class="mono"><span class="phase">Build</span><span class="muted">01:00.4</span></figcaption></figure>
+      <figure><button data-full="frames/chrome_1.jpg" aria-label="Open Liquid Chrome silence frame"><img src="frames/chrome_1.jpg" alt="A perfectly still chrome sphere with a single gold rim light" loading="lazy"></button><figcaption class="mono"><span class="phase">Silence</span><span class="muted">01:03.2</span></figcaption></figure>
+      <figure><button data-full="frames/chrome_2.jpg" aria-label="Open Liquid Chrome drop frame"><img src="frames/chrome_2.jpg" alt="Chrome ferrofluid spikes erupting outward against a low gold sun" loading="lazy"></button><figcaption class="mono"><span class="phase drop">Drop</span><span class="muted">01:03.82</span></figcaption></figure>
+    </div>
+    <div class="notes">
+      <dl><dt class="mono">Engine</dt><dd>Raymarched SDF with one bounce of inter-reflection, lit by a procedural studio: two strip softboxes, side strips and a gold horizon.</dd></dl>
+      <ul class="beats">
+        <li><span class="mono muted">Build</span><span>Surface wobble amplitude rides the roll envelope, and the satellite droplets orbit faster as it tightens.</span></li>
+        <li><span class="mono muted">Silence</span><span>Everything freezes into a perfect sphere. One rim light, no motion.</span></li>
+        <li><span class="mono muted">Drop</span><span>Ferrofluid spikes snap out on the downbeat, and spike length is driven per kick.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="style" id="ink">
+    <div class="head"><div class="code">C</div><h2>Gold Ink</h2><p class="log">Gold ink in black water, and the drop opens a black sun.</p></div>
+    <div class="frames">
+      <figure><button data-full="frames/ink_0.jpg" aria-label="Open Gold Ink build frame"><img src="frames/ink_0.jpg" alt="A plume of metallic gold ink rising through black water" loading="lazy"></button><figcaption class="mono"><span class="phase">Build</span><span class="muted">01:00.4</span></figcaption></figure>
+      <figure><button data-full="frames/ink_1.jpg" aria-label="Open Gold Ink silence frame"><img src="frames/ink_1.jpg" alt="A single thread of gold ink suspended in dark water" loading="lazy"></button><figcaption class="mono"><span class="phase">Silence</span><span class="muted">01:03.2</span></figcaption></figure>
+      <figure><button data-full="frames/ink_2.jpg" aria-label="Open Gold Ink drop frame"><img src="frames/ink_2.jpg" alt="Gold ink swirling into a ring around a black eclipse" loading="lazy"></button><figcaption class="mono"><span class="phase drop">Drop</span><span class="muted">01:03.82</span></figcaption></figure>
+    </div>
+    <div class="notes">
+      <dl><dt class="mono">Engine</dt><dd>Three-level domain-warped fbm. A metallic sheen comes from the field gradient, and the drop maps the field into log-polar space.</dd></dl>
+      <ul class="beats">
+        <li><span class="mono muted">Build</span><span>The plume rises and widens with the roll, and the warp strength climbs bar by bar.</span></li>
+        <li><span class="mono muted">Silence</span><span>Everything is drawn back into one thin thread.</span></li>
+        <li><span class="mono muted">Drop</span><span>The ink blooms into a ring around a black eclipse and turns a notch on every kick.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="style" id="ridge">
+    <div class="head"><div class="code">D</div><h2>Ridge Lines</h2><p class="log">A landscape drawn with sound lines, raised by the kick.</p></div>
+    <div class="frames">
+      <figure><button data-full="frames/ridge_0.jpg" aria-label="Open Ridge Lines build frame"><img src="frames/ridge_0.jpg" alt="Rolling terrain drawn as fine white and gold lines" loading="lazy"></button><figcaption class="mono"><span class="phase">Build</span><span class="muted">01:00.4</span></figcaption></figure>
+      <figure><button data-full="frames/ridge_1.jpg" aria-label="Open Ridge Lines silence frame"><img src="frames/ridge_1.jpg" alt="A flat line field with one gold line and a small sun on the horizon" loading="lazy"></button><figcaption class="mono"><span class="phase">Silence</span><span class="muted">01:03.2</span></figcaption></figure>
+      <figure><button data-full="frames/ridge_2.jpg" aria-label="Open Ridge Lines drop frame"><img src="frames/ridge_2.jpg" alt="A spire of gold lines rising in front of an eclipse ring" loading="lazy"></button><figcaption class="mono"><span class="phase drop">Drop</span><span class="muted">01:03.82</span></figcaption></figure>
+    </div>
+    <div class="notes">
+      <dl><dt class="mono">Engine</dt><dd>Canvas 2D: 96 occluding terrain lines in perspective, built from fbm plus ridged noise, with an additive glow on the accent lines.</dd></dl>
+      <ul class="beats">
+        <li><span class="mono muted">Build</span><span>Every sixth line is gold, and those accents travel toward camera on the 16ths.</span></li>
+        <li><span class="mono muted">Silence</span><span>The terrain flattens. One line stays lit.</span></li>
+        <li><span class="mono muted">Drop</span><span>A spire erupts in front of the eclipse. Line amplitude follows the kick envelope.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="style" id="type">
+    <div class="head"><div class="code">E</div><h2>Brutalist Type</h2><p class="log">The lyric is the visual. Type, timecode and one red.</p></div>
+    <div class="frames">
+      <figure><button data-full="frames/type_0.jpg" aria-label="Open Brutalist Type build frame"><img src="frames/type_0.jpg" alt="RAY OF SOLAR in heavy type, stretching wider line by line" loading="lazy"></button><figcaption class="mono"><span class="phase">Build</span><span class="muted">01:00.4</span></figcaption></figure>
+      <figure><button data-full="frames/type_1.jpg" aria-label="Open Brutalist Type silence frame"><img src="frames/type_1.jpg" alt="A black frame with one red hairline and the word Hold" loading="lazy"></button><figcaption class="mono"><span class="phase">Silence</span><span class="muted">01:03.2</span></figcaption></figure>
+      <figure><button data-full="frames/type_2.jpg" aria-label="Open Brutalist Type drop frame"><img src="frames/type_2.jpg" alt="FLEEING in black on red, cut horizontally with an outline echo" loading="lazy"></button><figcaption class="mono"><span class="phase drop">Drop</span><span class="muted">01:03.82</span></figcaption></figure>
+    </div>
+    <div class="notes">
+      <dl><dt class="mono">Engine</dt><dd>HTML/CSS type system (Inter Display Black, JetBrains Mono), rendered frame by frame. Live timecode and bar counters come from the beat map.</dd></dl>
+      <ul class="beats">
+        <li><span class="mono muted">Build</span><span>RAY OF SOLAR stretches horizontally with the roll (scaleX 1 → 2.35), with ghost echoes trailing behind.</span></li>
+        <li><span class="mono muted">Silence</span><span>One red hairline and the word HOLD.</span></li>
+        <li><span class="mono muted">Drop</span><span>FLEEING slams in, gets cut on the kick and leaves an outline echo. The lyric line sits in the corner.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <p class="mono muted">Reply with a letter (A–E), or two letters to blend.</p>
+    <p class="muted">Click any frame to view it full size. All five use the same beat map: 417 beats at 136 BPM, with bar and phrase markers exported for After Effects and Premiere.</p>
+  </footer>
+</div>
+
+<dialog id="lb" aria-label="Full-size frame">
+  <form method="dialog"><button aria-label="Close">Close ✕</button></form>
+  <img id="lbimg" alt="">
+  <p class="mono" id="lbcap"></p>
+</dialog>
+
+<script>
+  const lb = document.getElementById('lb'), img = document.getElementById('lbimg'), cap = document.getElementById('lbcap');
+  document.querySelectorAll('figure button').forEach(b => b.addEventListener('click', () => {
+    const fig = b.closest('figure'), sec = b.closest('section');
+    img.src = b.dataset.full; img.alt = b.querySelector('img').alt;
+    cap.textContent = sec.querySelector('.code').textContent + ' · ' + sec.querySelector('h2').textContent + ' · ' + fig.querySelector('.phase').textContent + ' · ' + fig.querySelector('figcaption .muted').textContent;
+    if (lb.showModal) lb.showModal();
+  }));
+  lb.addEventListener('click', e => { if (e.target === lb) lb.close(); });
+</script>

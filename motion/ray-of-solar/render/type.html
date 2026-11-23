@@ -1,0 +1,86 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  :root { --ink: #0b0b0b; --paper: #ece8df; --red: #ff3a1d; }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; }
+  .frame { position: absolute; inset: 0; overflow: hidden; font-family: "Inter Display", "Inter", sans-serif; }
+  .mono { font-family: "JetBrains Mono", monospace; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; }
+  .grid { position: absolute; inset: 0; background-image:
+      linear-gradient(to right, rgba(236,232,223,.07) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(236,232,223,.07) 1px, transparent 1px);
+    background-size: 160px 135px; }
+  .abs { position: absolute; }
+  .grain { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: overlay; opacity: .35; }
+  /* BUILD */
+  #f0 { background: var(--ink); color: var(--paper); display: none; }
+  #f0 .line { position: absolute; left: 96px; font-weight: 900; text-transform: uppercase; line-height: .8; white-space: nowrap; transform-origin: left center; }
+  #f0 .echo { opacity: .14; filter: blur(2px); }
+  /* SILENCE */
+  #f1 { background: #000; color: var(--paper); display: none; }
+  /* DROP */
+  #f2 { background: var(--red); color: var(--ink); display: none; }
+  #f2 .slice { position: absolute; left: 0; right: 0; top: 0; bottom: 0; font-weight: 900; font-size: 400px; line-height: 1;
+    letter-spacing: -.045em; white-space: nowrap; display: flex; align-items: center; justify-content: center; }
+</style></head>
+<body>
+<!-- BUILD: the roll stretches the type -->
+<div class="frame" id="f0">
+  <div class="grid"></div>
+  <div class="abs mono" style="left:96px;top:64px">Ray of Solar &nbsp;/&nbsp; Build</div>
+  <div class="abs mono" style="right:96px;top:64px;text-align:right">00:58:12 &nbsp;·&nbsp; 136 BPM &nbsp;·&nbsp; F# min</div>
+  <div class="line" style="top:150px;font-size:250px;transform:scaleX(1)">Ray</div>
+  <div class="line echo" style="top:150px;font-size:250px;transform:translateX(40px) scaleX(1.12)">Ray</div>
+  <div class="line" style="top:370px;font-size:250px;transform:scaleX(1.55)">of</div>
+  <div class="line echo" style="top:370px;font-size:250px;transform:translateX(90px) scaleX(1.85)">of</div>
+  <div class="line" style="top:590px;font-size:250px;transform:scaleX(2.35);color:var(--red)">Solar</div>
+  <div class="line echo" style="top:590px;font-size:250px;transform:translateX(160px) scaleX(2.9);color:var(--red)">Solar</div>
+  <div class="abs" style="left:96px;right:96px;bottom:110px;height:2px;background:rgba(236,232,223,.15)"></div>
+  <div class="abs" style="left:96px;width:1240px;bottom:110px;height:2px;background:var(--red)"></div>
+  <div class="abs mono" style="left:96px;bottom:64px">Roll &nbsp;16ths</div>
+  <div class="abs mono" style="right:96px;bottom:64px">Bar 03 / 04</div>
+</div>
+
+<!-- SILENCE: 1.1 seconds of nothing -->
+<div class="frame" id="f1">
+  <div class="abs" style="left:0;right:0;top:539px;height:1px;background:var(--red)"></div>
+  <div class="abs mono" style="left:50%;top:560px;transform:translateX(-50%);opacity:.55">Hold</div>
+  <div class="abs mono" style="left:96px;bottom:64px;opacity:.35">01:02:70</div>
+  <div class="abs mono" style="right:96px;bottom:64px;opacity:.35">−1.12 s to drop</div>
+</div>
+
+<!-- DROP: the word is cut by the kick -->
+<div class="frame" id="f2">
+  <div id="slices"></div>
+  <div class="abs mono" style="left:96px;top:64px">Drop &nbsp;/&nbsp; 01:03:82</div>
+  <div class="abs mono" style="right:96px;top:64px">Kick 01 / 32</div>
+  <div class="abs mono" style="left:96px;bottom:64px">I ride a chariot of notions</div>
+  <div class="abs mono" style="right:96px;bottom:64px">136 BPM</div>
+</div>
+<canvas class="grain" id="g" width="1920" height="1080"></canvas>
+<script>
+const shot = +new URLSearchParams(location.search).get('shot');
+document.getElementById('f' + shot).style.display = 'block';
+if (shot === 2) {
+  const host = document.getElementById('slices');
+  const echo = document.createElement('div'); echo.className = 'slice'; echo.textContent = 'FLEEING';
+  Object.assign(echo.style, { color: 'transparent', webkitTextStroke: '2px rgba(11,11,11,.55)', transform: 'translate(34px, 26px)' });
+  host.appendChild(echo);
+  const cuts = [0, 556, 1080], shift = [0, 84];
+  cuts.slice(0, -1).forEach((top, i) => {
+    const d = document.createElement('div'); d.className = 'slice'; d.textContent = 'FLEEING';
+    d.style.clipPath = `inset(${top}px 0 ${1080 - cuts[i + 1]}px 0)`;
+    d.style.transform = `translateX(${shift[i]}px)`;
+    host.appendChild(d);
+  });
+  const line = document.createElement('div'); line.className = 'abs';
+  Object.assign(line.style, { left: '0', right: '0', top: '555px', height: '2px', background: '#ece8df' });
+  host.appendChild(line);
+}
+// grain
+const g = document.getElementById('g').getContext('2d'), id = g.createImageData(1920, 1080); let s = 7;
+for (let i = 0; i < id.data.length; i += 4) { s = (s * 1103515245 + 12345) & 0x7fffffff; const v = (s >> 16) & 255;
+  id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 40; }
+g.putImageData(id, 0, 0);
+document.fonts.ready.then(() => { window.done = true; });
+</script>
+</body></html>

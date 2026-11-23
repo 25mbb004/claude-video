@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+  .t {
+    position: absolute; left: 0; right: 0; text-align: center;
+    font-family: "Inter Display", "Inter", sans-serif; font-weight: 200;
+    color: #e6d3a8; text-transform: uppercase; white-space: nowrap;
+    text-shadow: 0 0 18px rgba(255, 190, 110, 0.55);
+    opacity: 0; pointer-events: none;
+  }
+  #l1 { top: 760px; font-size: 26px; letter-spacing: 0.9em; }
+  #l2 { top: 515px; font-size: 54px; letter-spacing: 1.1em; font-weight: 100; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "./node_modules/three/build/three.module.js",
+  "three/addons/": "./node_modules/three/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="l1" class="t">I ride out on a ray of solar</div>
+<div id="l2" class="t">I'm fleeing</div>
+<script type="module" src="./scene.js"></script>
+</body>
+</html>

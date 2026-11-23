@@ -1,0 +1,46 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
+</head><body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// usage: shader.html?s=<style>&shot=<0|1|2>&tiles=N
+const q = new URLSearchParams(location.search);
+const style = q.get('s'), shot = +q.get('shot'), tiles = +(q.get('tiles') || 6);
+const W = 1920, H = 1080;
+const gl = document.getElementById('c').getContext('webgl2', { preserveDrawingBuffer: true, antialias: false });
+const vs = `#version 300 es
+in vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }`;
+(async () => {
+  const common = await (await fetch('common.glsl')).text();
+  const body = await (await fetch(style + '.frag')).text();
+  const fs = `#version 300 es
+precision highp float;
+uniform vec2 uRes; uniform float uShot; uniform float uTime;
+out vec4 fragColor;
+${common}
+${body}
+void main(){ fragColor = vec4(render(gl_FragCoord.xy), 1.); }`;
+  const mk = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o);
+    if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) { throw new Error(gl.getShaderInfoLog(o)); } return o; };
+  const pr = gl.createProgram();
+  gl.attachShader(pr, mk(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, mk(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+  gl.useProgram(pr);
+  const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.uniform2f(gl.getUniformLocation(pr, 'uRes'), W, H);
+  gl.uniform1f(gl.getUniformLocation(pr, 'uShot'), shot);
+  gl.uniform1f(gl.getUniformLocation(pr, 'uTime'), +(q.get('t') || 0));
+  gl.viewport(0, 0, W, H); gl.enable(gl.SCISSOR_TEST);
+  const px = new Uint8Array(4);
+  const tw = Math.ceil(W / tiles), th = Math.ceil(H / tiles);
+  for (let y = 0; y < tiles; y++) for (let x = 0; x < tiles; x++) {
+    gl.scissor(x * tw, y * th, tw, th); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.readPixels(x * tw, y * th, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); // force completion per tile
+    await new Promise(r => setTimeout(r, 0));
+  }
+  window.done = true;
+})().catch(e => { window.err = String(e); window.done = true; });
+</script></body></html>

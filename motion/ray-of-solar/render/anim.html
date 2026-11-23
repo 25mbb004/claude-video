@@ -1,0 +1,178 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}#gl{display:none}</style>
+</head><body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<canvas id="gl" width="960" height="540"></canvas>
+<script>
+// INK RIDGES — animated. Clip-local time t: 0 = 0:58.00 in the song, 15 = 1:13.00
+(async () => {
+const W = 1920, H = 1080;
+const BUILD_END = 4.70, DROP = 5.82, BEAT = 0.443, BAR = BEAT * 4, END = 15;
+const ROLL = [58.05,58.18,58.38,58.52,58.61,58.74,58.83,58.95,59.05,59.27,59.39,59.51,59.72,59.83,59.95,60.06,60.17,
+  60.28,60.39,60.61,60.73,60.84,60.95,61.06,61.17,61.28,61.39,61.5,61.61,61.72,61.84,61.94,62.06,62.16,62.28,62.4,62.51,62.63].map(x => x - 58);
+const KICKS = []; for (let k = DROP; k < END + .5; k += BEAT) KICKS.push(k);
+const pulse = (t, hits, rate) => { let s = 0; for (const h of hits) if (t >= h) s += Math.exp(-(t - h) * rate); return Math.min(s, 1.5); };
+const clamp = (x, a = 0, b = 1) => Math.min(Math.max(x, a), b);
+const sm = t => t * t * (3 - 2 * t);
+const lerp = (a, b, u) => a + (b - a) * u;
+const easeOutBack = u => { const c = 1.9; return 1 + (c + 1) * Math.pow(u - 1, 3) + c * Math.pow(u - 1, 2); };
+const easeOut = u => 1 - Math.pow(1 - u, 3);
+
+// ---------- ink sky: the Gold Ink shader, rendered live at half res ----------
+const gl = document.getElementById('gl').getContext('webgl2', { preserveDrawingBuffer: true });
+const common = await (await fetch('common.glsl')).text(), body = await (await fetch('ink_anim.frag')).text();
+const fs = `#version 300 es
+precision highp float;
+uniform vec2 uRes; uniform float uShot; uniform float uTime;
+out vec4 fragColor;
+${common}
+${body}
+void main(){ fragColor = vec4(render(gl_FragCoord.xy), 1.); }`;
+const mk = (ty, src) => { const o = gl.createShader(ty); gl.shaderSource(o, src); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+const pr = gl.createProgram();
+gl.attachShader(pr, mk(gl.VERTEX_SHADER, `#version 300 es\nin vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }`));
+gl.attachShader(pr, mk(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(pr); gl.useProgram(pr);
+const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+const al = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(al); gl.vertexAttribPointer(al, 2, gl.FLOAT, false, 0, 0);
+const U = n => gl.getUniformLocation(pr, n);
+gl.uniform2f(U('uRes'), 960, 540); gl.viewport(0, 0, 960, 540);
+function ink(shot, time, rot, grow, pulse) {
+  gl.uniform1f(U('uShot'), shot); gl.uniform1f(U('uTime'), time); gl.uniform1f(U('uRot'), rot);
+  gl.uniform1f(U('uGrow'), grow); gl.uniform1f(U('uPulse'), pulse);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  return gl.canvas;
+}
+const FILL = await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = 'out/ink_fill.jpg'; });
+
+// ---------- terrain noise ----------
+const perm = new Uint8Array(512); { let s = 1337; const p = [...Array(256).keys()];
+  for (let i = 255; i > 0; i--) { s = (s * 16807) % 2147483647; const j = s % (i + 1); [p[i], p[j]] = [p[j], p[i]]; }
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255]; }
+const hv = (x, y) => perm[(perm[x & 255] + y) & 511] / 255;
+function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = sm(x - xi), yf = sm(y - yi);
+  const a = hv(xi, yi), b = hv(xi + 1, yi), cc = hv(xi, yi + 1), d = hv(xi + 1, yi + 1);
+  return a + (b - a) * xf + (cc - a) * yf + (a - b - cc + d) * xf * yf; }
+function fbm(x, y) { let s = 0, a = .5; for (let i = 0; i < 5; i++) { s += a * vnoise(x, y); x *= 2.03; y *= 2.03; a *= .5; } return s; }
+function ridged(x, y) { let s = 0, a = .55; for (let i = 0; i < 5; i++) { s += a * Math.pow(1 - Math.abs(2 * vnoise(x, y) - 1), 2); x *= 2.1; y *= 2.1; a *= .5; } return s; }
+
+const c = document.getElementById('c'), g = c.getContext('2d');
+const PAT = g.createPattern(FILL, 'repeat');
+const zNear = 3.5, zFar = 60, f = 1150, ROWS = 96;
+
+window.renderAt = (t) => {
+  // ---------- direction ----------
+  const roll = t < BUILD_END ? pulse(t, ROLL, 14) : 0;
+  const kick = t >= DROP ? pulse(t, KICKS, 7) : 0;
+  let amp, spire, camH, scroll, nearDamp, accentEvery, lineBoost = 1, flash = 0, fade = 0, roll2d = 0, sky;
+  if (t < BUILD_END) {
+    const u = t / BUILD_END;
+    amp = .7 + .65 * u; spire = .45 + .45 * u; camH = 1.7; scroll = t * 1.1; nearDamp = 0; accentEvery = 4;
+    lineBoost = 1 + 1.4 * roll;
+    sky = { shot: 0, grow: lerp(-.55, .62, sm(u)), alpha: .35 + .5 * u };
+  } else if (t < DROP) {
+    const s = (t - BUILD_END) / (DROP - BUILD_END);
+    amp = lerp(1.35, .05, sm(clamp(s * 4))); spire = lerp(.9, 0, sm(clamp(s * 4))); camH = 1.25; scroll = BUILD_END * 1.1 + (t - BUILD_END) * .3;
+    nearDamp = 0; accentEvery = 0;
+    sky = { shot: 1, alpha: sm(clamp(s * 2.5)) };
+  } else {
+    const d = t - DROP, bar = Math.floor(d / BAR), ub = (d % BAR) / BAR;
+    const erupt = easeOutBack(clamp(d / .42));
+    amp = 3.0 * (.82 + .18 * clamp(erupt, 0, 1.2)) * (1 + .1 * kick); spire = 1.4 * erupt; nearDamp = 1; accentEvery = 1;
+    scroll = BUILD_END * 1.1 + 1.12 * .3 + d * 2.4;
+    camH = [2.6, 1.45, 3.7, 2.1, 2.6, 2.4][Math.min(bar, 5)] + (bar === 4 ? -ub * .5 : 0);
+    roll2d = bar === 3 ? -.035 : 0;
+    flash = Math.exp(-d * 7.5);
+    const notch = Math.floor(d / BEAT) * .07 + easeOut(clamp((d % BEAT) / .12)) * .07;
+    sky = { shot: 2, grow: .55 + .45 * easeOut(clamp(d / .5)), rot: -(d * .1 + notch), pulse: .55 * kick, alpha: 1 };
+    fade = sm(clamp((t - 14.55) / .45));
+  }
+  const proj = (x, y, z) => [W / 2 + x / z * f, H * .5 - (y - camH) / z * f + 40];
+  function height(x, z) {
+    const env = Math.exp(-x * x / (2 * (3.2 + z * .12) ** 2));
+    const zs = z + scroll;
+    let h = (fbm(x * .45 + 10, zs * .45) * .6 + ridged(x * .32 + 3, zs * .32) * .7) * env;
+    h += spire * 1.6 * Math.exp(-(x * x) / 2.2 - ((z - 26) ** 2) / 30) * (.7 + .5 * ridged(x * .6, z * .6));
+    const nd = nearDamp ? .25 + .75 * sm(clamp((z - 4) / 18)) : 1;
+    return h * amp * nd;
+  }
+
+  // ---------- draw ----------
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.filter = 'none';
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  if (roll2d) { g.translate(W / 2, H / 2); g.rotate(roll2d); g.scale(1.06, 1.06); g.translate(-W / 2, -H / 2); }
+  const hy = proj(0, 0, 1e6)[1];
+  const skyG = g.createLinearGradient(0, hy - 420, 0, hy + 10);
+  skyG.addColorStop(0, 'rgba(0,0,0,0)'); skyG.addColorStop(1, `rgba(255,140,50,${t >= DROP ? .2 + .08 * kick : .08})`);
+  g.fillStyle = skyG; g.fillRect(-100, -100, W + 200, hy + 110);
+
+  // ink in the sky
+  if (sky.shot !== 1) {
+    const src = ink(sky.shot, t, sky.rot || 0, sky.grow, sky.pulse || 0);
+    g.globalCompositeOperation = 'screen'; g.filter = 'contrast(1.9) brightness(1.05) saturate(.72)'; g.globalAlpha = sky.alpha;
+    if (sky.shot === 2) g.drawImage(src, 0, (hy - 230) - 540, 1920, 1080);
+    else g.drawImage(src, 330, -170, 1920, 1080);
+    g.globalCompositeOperation = 'source-over'; g.filter = 'none'; g.globalAlpha = 1;
+  } else {
+    const glow = g.createRadialGradient(W / 2, hy - 8, 6, W / 2, hy - 8, 120);
+    glow.addColorStop(0, `rgba(255,190,110,${.5 * sky.alpha})`); glow.addColorStop(1, 'rgba(255,120,40,0)');
+    g.fillStyle = glow; g.fillRect(0, 0, W, H);
+  }
+
+  // terrain lines, far → near
+  PAT.setTransform(new DOMMatrix());
+  for (let r = ROWS - 1; r >= 0; r--) {
+    const tt = r / (ROWS - 1);
+    const z = zNear + (zFar - zNear) * Math.pow(tt, 1.6);
+    const pts = [];
+    for (let i = 0; i <= 400; i++) { const x = (i / 400 - .5) * z * 2.1; pts.push(proj(x, height(x, z), z)); }
+    g.beginPath(); g.moveTo(pts[0][0], H + 60);
+    for (const p of pts) g.lineTo(p[0], p[1]);
+    g.lineTo(pts[pts.length - 1][0], H + 60); g.closePath(); g.fillStyle = '#000'; g.fill();
+    g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]));
+    const depth = 1 - tt;
+    // accent rows travel toward camera with the scroll
+    const rowPhase = Math.floor(r + scroll * 1.6);
+    const accent = accentEvery === 1 || (accentEvery > 1 && rowPhase % accentEvery === 0);
+    const haze = .12 + .88 * sm(clamp(depth * 1.7));
+    const lw = .8 + 1.6 * depth * (accent ? 1.3 : 1);
+    if (accent) {
+      const a = (t >= DROP ? .3 + .7 * depth : .25 + .7 * depth) * Math.min(1.6, lineBoost) * (1 + .35 * kick);
+      g.strokeStyle = `rgba(255,170,90,${clamp(a * .35 * haze)})`; g.lineWidth = lw;
+      g.shadowColor = `rgba(255,150,60,${.85 * haze})`; g.shadowBlur = (14 * depth + 4) * haze * (1 + kick * .6); g.stroke(); g.shadowBlur = 0;
+      if (depth > .22) {
+        PAT.setTransform(new DOMMatrix().translate((r * 389 + t * 60) % 1920, (r * 151 - t * 25) % 1080));
+        g.globalAlpha = clamp(a * 1.25 * haze); g.strokeStyle = PAT; g.lineWidth = lw * 1.9; g.stroke(); g.globalAlpha = 1;
+      }
+    } else {
+      const a = (t < DROP && t >= BUILD_END ? .06 + .12 * depth : (.25 + .7 * depth) * .6) * haze;
+      g.strokeStyle = `rgba(220,225,230,${a})`; g.lineWidth = lw; g.stroke();
+    }
+  }
+  // silence: all the ink collapses into one thread on the horizon
+  if (sky.shot === 1) {
+    const src = ink(1, t, 0, 1, 0);
+    g.globalCompositeOperation = 'screen'; g.filter = 'contrast(1.9) brightness(1.1) saturate(.72)'; g.globalAlpha = sky.alpha;
+    g.drawImage(src, -60, hy - 14 - 540 * .3, 2040, 1080 * .3);
+    g.globalCompositeOperation = 'source-over'; g.filter = 'none'; g.globalAlpha = 1;
+  }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+
+  // flash on the downbeat, fade at the end
+  if (flash > .01) { g.fillStyle = `rgba(255,232,190,${flash * .9})`; g.fillRect(0, 0, W, H); }
+  // vignette
+  const vg = g.createRadialGradient(W / 2, H / 2, H * .35, W / 2, H / 2, H * 1.05);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.75)');
+  g.fillStyle = vg; g.fillRect(0, 0, W, H);
+  if (fade > 0) { g.fillStyle = `rgba(0,0,0,${fade})`; g.fillRect(0, 0, W, H); }
+  // animated film grain
+  const id = g.getImageData(0, 0, W, H), dd = id.data; let s = (Math.floor(t * 24) * 7919 + 13) | 0;
+  for (let i = 0; i < dd.length; i += 4) { s = (s * 1103515245 + 12345) & 0x7fffffff; const n = ((s >> 8) / 8388608 - 1) * 8;
+    dd[i] += n; dd[i + 1] += n; dd[i + 2] += n; }
+  g.putImageData(id, 0, 0);
+  return true;
+};
+window.ready = true;
+})().catch(e => { window.err = String(e); window.ready = true; });
+</script></body></html>
